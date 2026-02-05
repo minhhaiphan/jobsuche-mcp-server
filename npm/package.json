@@ -4,7 +4,8 @@
   "description": "Template MCP Server - A Model Context Protocol server template using PulseEngine MCP framework",
   "main": "index.js",
   "bin": {
-    "template-mcp-server": "./run.js"
+    "template-mcp-server": "./run.js",
+    "template-mcp-http-adapter": "./http-adapter.js"
   },
   "scripts": {
     "postinstall": "node install.js",
