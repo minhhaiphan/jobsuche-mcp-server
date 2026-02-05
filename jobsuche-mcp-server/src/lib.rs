@@ -36,7 +36,6 @@ pub struct JobsucheServerStatus {
 
 /// Parameters for searching jobs
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
 pub struct SearchJobsParams {
     /// Job title or keywords (e.g., "Software Engineer", "Data Scientist")
     pub job_title: Option<String>,
@@ -122,7 +121,6 @@ pub struct JobSummary {
 
 /// Parameters for getting job details
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
 pub struct GetJobDetailsParams {
     /// Job reference number (refnr from search results)
     pub reference_number: String,
@@ -130,7 +128,6 @@ pub struct GetJobDetailsParams {
 
 /// Optional field filtering for responses
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
 pub struct FieldFilter {
     /// Fields to include (if specified, only these fields are returned)
     pub include_fields: Option<Vec<String>>,
@@ -141,7 +138,6 @@ pub struct FieldFilter {
 
 /// Parameters for search_jobs_with_details
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
 pub struct SearchJobsWithDetailsParams {
     /// Search parameters (same as search_jobs)
     pub job_title: Option<String>,
@@ -189,7 +185,6 @@ pub struct SearchJobsWithDetailsResult {
 
 /// Single search configuration for batch operations
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
 pub struct BatchSearchItem {
     /// Name for this search (for identification in results)
     pub name: String,
@@ -207,7 +202,6 @@ pub struct BatchSearchItem {
 
 /// Parameters for batch_search_jobs
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
 pub struct BatchSearchJobsParams {
     /// List of searches to perform (max: 5)
     pub searches: Vec<BatchSearchItem>,
