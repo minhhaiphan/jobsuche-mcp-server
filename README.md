@@ -128,6 +128,15 @@ docker build -t jobsuche-mcp .
 docker run --rm -p 3541:3541 jobsuche-mcp
 ```
 
+If you build a custom image without the npm package files, ensure the adapter has a
+binary path via `MCP_STDIO_COMMAND`:
+
+```bash
+docker run --rm -p 3541:3541 \
+  -e MCP_STDIO_COMMAND=/usr/local/bin/jobsuche-mcp-server \
+  jobsuche-mcp
+```
+
 Health check:
 
 ```bash

@@ -2,7 +2,6 @@
 
 const http = require("http");
 const { spawn } = require("child_process");
-const { getBinaryPath } = require("./index.js");
 
 const DEFAULT_PORT = 3541;
 const DEFAULT_TIMEOUT_MS = 30000;
@@ -87,7 +86,22 @@ function startServer() {
     ? Number(process.env.MCP_HTTP_TIMEOUT_MS)
     : DEFAULT_TIMEOUT_MS;
 
-  const command = process.env.MCP_STDIO_COMMAND || getBinaryPath();
+  let command = process.env.MCP_STDIO_COMMAND;
+
+  if (!command) {
+    try {
+      const { getBinaryPath } = require("./index.js");
+      command = getBinaryPath();
+    } catch (err) {
+      console.error(
+        "❌ MCP_STDIO_COMMAND is required when index.js is not available.",
+      );
+      console.error(
+        "Set MCP_STDIO_COMMAND to the MCP stdio binary path (e.g. /usr/local/bin/jobsuche-mcp-server).",
+      );
+      process.exit(1);
+    }
+  }
   const child = spawn(command, binaryArgs, {
     stdio: ["pipe", "pipe", "pipe"],
     env: process.env,
