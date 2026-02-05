@@ -30,11 +30,9 @@ pulseengine-mcp-protocol = { workspace = true }
 pulseengine-mcp-transport = { workspace = true }
 schemars = "1.0"
 
-# Jobsuche API client
-jobsuche = { version = "0.3.0", features = ["async"], default-features = false }
-
-# Force native-tls for proper SSL certificate handling in Docker
+# HTTP client for direct API access
 reqwest = { version = "0.12", default-features = false, features = ["native-tls", "json"] }
+urlencoding = "2.1"
 
 [dev-dependencies]
 serial_test = "3.2"
