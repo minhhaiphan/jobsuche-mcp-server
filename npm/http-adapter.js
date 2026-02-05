@@ -4,7 +4,7 @@ const http = require("http");
 const { spawn } = require("child_process");
 const { getBinaryPath } = require("./index.js");
 
-const DEFAULT_PORT = 3451;
+const DEFAULT_PORT = 3541;
 const DEFAULT_TIMEOUT_MS = 30000;
 
 function parseArgs(argv) {

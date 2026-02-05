@@ -96,17 +96,17 @@ npm install -g @wunderfrucht/jobsuche-mcp-server
 2. Start the adapter (spawns the stdio server automatically):
 
 ```bash
-template-mcp-http-adapter --port 3001
+template-mcp-http-adapter --port 3541
 ```
 
 3. Configure n8n MCP client to use:
 
-- **HTTP JSON-RPC endpoint:** `http://localhost:3001/rpc`
-- **SSE endpoint:** `http://localhost:3001/sse`
+- **HTTP JSON-RPC endpoint:** `http://localhost:3541/rpc`
+- **SSE endpoint:** `http://localhost:3541/sse`
 
 #### Adapter configuration
 
-- `--port <number>`: HTTP port (default: 3001)
+- `--port <number>`: HTTP port (default: 3541)
 - `MCP_STDIO_COMMAND`: Override the stdio command to run (defaults to bundled binary)
 - `MCP_STDIO_ARGS`: Space-separated args passed to the stdio server
 - `MCP_HTTP_TIMEOUT_MS`: RPC timeout in milliseconds (default: 30000)
@@ -117,6 +117,35 @@ Example with custom binary and args:
 MCP_STDIO_COMMAND="/path/to/jobsuche-mcp-server" \
 MCP_STDIO_ARGS="--log-level debug" \
 template-mcp-http-adapter --port 3100
+```
+
+### Docker Deployment (HTTP/SSE Adapter)
+
+Build and run the container (adapter listens on 3541 by default):
+
+```bash
+docker build -t jobsuche-mcp .
+docker run --rm -p 3541:3541 jobsuche-mcp
+```
+
+Health check:
+
+```bash
+curl -s http://localhost:3541/health
+```
+
+JSON-RPC test:
+
+```bash
+curl -s http://localhost:3541/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```
+
+SSE test:
+
+```bash
+curl -N http://localhost:3541/sse
 ```
 
 ## Available Tools
