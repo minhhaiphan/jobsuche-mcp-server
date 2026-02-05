@@ -35,46 +35,32 @@ function parseArgs(argv) {
 }
 
 function encodeMessage(message) {
-  const json = JSON.stringify(message);
-  const length = Buffer.byteLength(json, "utf8");
-  return `Content-Length: ${length}\r\n\r\n${json}`;
+  // MCP STDIO uses newline-delimited JSON (NDJSON), not Content-Length framing
+  return JSON.stringify(message) + "\n";
 }
 
 function createStdioParser(onMessage) {
-  let buffer = Buffer.alloc(0);
+  let buffer = "";
 
   return (chunk) => {
-    buffer = Buffer.concat([buffer, chunk]);
+    buffer += chunk.toString("utf8");
 
-    while (true) {
-      const headerEnd = buffer.indexOf("\r\n\r\n");
-      if (headerEnd === -1) {
-        break;
+    // Process complete lines (newline-delimited JSON)
+    let newlineIndex;
+    while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+      const line = buffer.slice(0, newlineIndex).trim();
+      buffer = buffer.slice(newlineIndex + 1);
+
+      if (!line) {
+        continue; // Skip empty lines
       }
-
-      const header = buffer.slice(0, headerEnd).toString("utf8");
-      const match = header.match(/Content-Length:\s*(\d+)/i);
-      if (!match) {
-        buffer = buffer.slice(headerEnd + 4);
-        continue;
-      }
-
-      const length = Number(match[1]);
-      const messageStart = headerEnd + 4;
-      const messageEnd = messageStart + length;
-
-      if (buffer.length < messageEnd) {
-        break;
-      }
-
-      const payload = buffer.slice(messageStart, messageEnd).toString("utf8");
-      buffer = buffer.slice(messageEnd);
 
       try {
-        const json = JSON.parse(payload);
+        const json = JSON.parse(line);
         onMessage(json);
       } catch (err) {
         console.error("❌ Failed to parse MCP message:", err.message);
+        console.error("   Raw line:", line.substring(0, 100) + (line.length > 100 ? "..." : ""));
       }
     }
   };
