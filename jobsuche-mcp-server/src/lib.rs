@@ -217,6 +217,64 @@ pub struct GetJobDetailsResult {
     pub partner_url: Option<String>,
 }
 
+/// Single search configuration for batch operations
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct BatchSearchItem {
+    /// Name for this search (for identification in results)
+    pub name: String,
+    /// Job title or keywords
+    pub job_title: Option<String>,
+    /// Location name
+    pub location: Option<String>,
+    /// Search radius in kilometers
+    pub radius_km: Option<u64>,
+    /// Employment type filter
+    pub employment_type: Option<Vec<String>>,
+    /// Contract type filter
+    pub contract_type: Option<Vec<String>>,
+    /// Days since publication
+    pub published_since_days: Option<u64>,
+    /// Employer name to search for
+    pub employer: Option<String>,
+    /// Branch/industry to search in
+    pub branch: Option<String>,
+}
+
+/// Parameters for batch_search_jobs
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct BatchSearchJobsParams {
+    /// List of searches to perform (max: 5)
+    pub searches: Vec<BatchSearchItem>,
+    /// Automatically fetch details for top N results per search (default: 2, max: 5)
+    pub max_details_per_search: Option<u64>,
+}
+
+/// Result from a single batch search
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchSearchItemResult {
+    /// Name of this search
+    pub search_name: String,
+    /// Total number of results found
+    pub total_results: Option<u64>,
+    /// Number of jobs returned with details
+    pub jobs_count: usize,
+    /// Job listings with full details
+    pub jobs: Vec<GetJobDetailsResult>,
+    /// Error message if search failed
+    pub error: Option<String>,
+}
+
+/// Result from batch_search_jobs
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchSearchJobsResult {
+    /// Number of searches performed
+    pub searches_count: usize,
+    /// Results from each search
+    pub results: Vec<BatchSearchItemResult>,
+    /// Total execution time
+    pub total_duration_ms: u64,
+}
+
 // ============================================================================
 // API Client
 // ============================================================================
@@ -518,6 +576,117 @@ impl JobsucheMcpServer {
         Ok(result)
     }
 
+    /// Perform multiple job searches in a single operation
+    ///
+    /// This tool allows you to search for different types of jobs simultaneously,
+    /// making it perfect for comparing opportunities across employers, locations,
+    /// or job types. Each search can have different parameters and will return
+    /// results independently.
+    ///
+    /// # Examples
+    /// - Compare employers: `{"searches": [{"name": "BARMER", "employer": "BARMER", "location": "Wuppertal"}, {"name": "Siemens", "employer": "Siemens", "location": "Wuppertal"}], "max_details_per_search": 3}`
+    /// - Different job types: `{"searches": [{"name": "Sekretariat", "job_title": "Sekretärin"}, {"name": "Sport", "job_title": "Schwimm"}]}`
+    #[instrument(skip(self))]
+    pub async fn batch_search_jobs(
+        &self,
+        params: BatchSearchJobsParams,
+    ) -> anyhow::Result<BatchSearchJobsResult> {
+        let start = Instant::now();
+        let searches_count = params.searches.len().min(5); // Limit to 5 searches to respect rate limits
+
+        info!("Performing batch search with {} searches", searches_count);
+
+        let max_details = params.max_details_per_search.unwrap_or(2).min(5);
+        let mut results = Vec::new();
+
+        // Process each search
+        for (search_idx, search_item) in params.searches.iter().take(searches_count).enumerate() {
+            // Small delay between searches to avoid rate limiting (except first)
+            if search_idx > 0 {
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+            }
+            info!("Processing search: {}", search_item.name);
+
+            // Convert to SearchJobsParams
+            let search_params = SearchJobsParams {
+                job_title: search_item.job_title.clone(),
+                location: search_item.location.clone(),
+                radius_km: search_item.radius_km,
+                employment_type: search_item.employment_type.clone(),
+                contract_type: search_item.contract_type.clone(),
+                published_since_days: search_item.published_since_days,
+                page_size: Some(max_details),
+                page: None,
+                employer: search_item.employer.clone(),
+                branch: search_item.branch.clone(),
+            };
+
+            // Perform search
+            let search_result = match self.search_jobs(search_params).await {
+                Ok(result) => result,
+                Err(e) => {
+                    // If search fails, add error result and continue
+                    results.push(BatchSearchItemResult {
+                        search_name: search_item.name.clone(),
+                        total_results: None,
+                        jobs_count: 0,
+                        jobs: Vec::new(),
+                        error: Some(format!("Search failed: {}", e)),
+                    });
+                    continue;
+                }
+            };
+
+            // Fetch details if requested (with delay to respect rate limits)
+            let mut jobs_with_details = Vec::new();
+            if max_details > 0 {
+                for (detail_idx, job) in search_result.jobs.iter().take(max_details as usize).enumerate() {
+                    // Small delay between detail fetches (except first in this search)
+                    if detail_idx > 0 {
+                        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                    }
+
+                    match self
+                        .get_job_details(GetJobDetailsParams {
+                            reference_number: job.reference_number.clone(),
+                        })
+                        .await
+                    {
+                        Ok(details) => jobs_with_details.push(details),
+                        Err(e) => {
+                            info!(
+                                "Failed to fetch details for {} in search '{}': {}",
+                                job.reference_number, search_item.name, e
+                            );
+                            // Continue with other jobs even if one fails
+                        }
+                    }
+                }
+            }
+
+            results.push(BatchSearchItemResult {
+                search_name: search_item.name.clone(),
+                total_results: search_result.total_results,
+                jobs_count: jobs_with_details.len(),
+                jobs: jobs_with_details,
+                error: None,
+            });
+        }
+
+        let duration = start.elapsed();
+        info!(
+            "Batch search completed: {} searches in {:?}",
+            results.len(),
+            duration
+        );
+
+        Ok(BatchSearchJobsResult {
+            searches_count: results.len(),
+            results,
+            total_duration_ms: duration.as_millis() as u64,
+        })
+    }
+
     /// Get server status and connection information
     #[instrument(skip(self))]
     pub async fn get_server_status(&self) -> anyhow::Result<JobsucheServerStatus> {
@@ -545,7 +714,7 @@ impl JobsucheMcpServer {
             uptime_seconds: self.get_uptime_seconds(),
             api_url: self.config.api_url.clone(),
             api_connection_status: connection_status,
-            tools_count: 3,
+            tools_count: 4,
         })
     }
 }
