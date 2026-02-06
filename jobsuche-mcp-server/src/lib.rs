@@ -19,37 +19,54 @@ use config::JobsucheConfig;
 // API Response Types (matching actual API response format)
 // ============================================================================
 
+// Allow unknown fields to avoid deserialization errors when API adds new fields
+fn default_vec<T>() -> Vec<T> { Vec::new() }
+
 #[derive(Debug, Clone, Deserialize)]
 struct ApiSearchResponse {
+    #[serde(default = "default_vec")]
     stellenangebote: Vec<ApiJobListing>,
     #[serde(rename = "maxErgebnisse")]
     max_ergebnisse: Option<u64>,
     page: Option<u64>,
     size: Option<u64>,
+    // Ignore any additional fields
+    #[serde(flatten)]
+    _extra: std::collections::HashMap<String, serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 struct ApiJobListing {
+    #[serde(default)]
     beruf: String,
     titel: Option<String>,
+    #[serde(default)]
     refnr: String,
+    #[serde(default)]
     arbeitsort: ApiArbeitsort,
+    #[serde(default)]
     arbeitgeber: String,
     #[serde(rename = "aktuelleVeroeffentlichungsdatum")]
     aktuelle_veroeffentlichungsdatum: Option<String>,
     #[serde(rename = "externeUrl")]
     externe_url: Option<String>,
+    // Ignore any additional fields
+    #[serde(flatten)]
+    _extra: std::collections::HashMap<String, serde_json::Value>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Default)]
 struct ApiArbeitsort {
     ort: Option<String>,
     plz: Option<String>,
     region: Option<String>,
     land: Option<String>,
+    // Ignore any additional fields like koordinaten, strasse, entfernung
+    #[serde(flatten)]
+    _extra: std::collections::HashMap<String, serde_json::Value>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Default)]
 struct ApiJobDetails {
     titel: Option<String>,
     stellenbeschreibung: Option<String>,
@@ -78,23 +95,35 @@ struct ApiJobDetails {
     chiffrenummer: Option<String>,
     #[serde(rename = "allianzpartnerUrl")]
     allianzpartner_url: Option<String>,
+    // Ignore any additional fields
+    #[serde(flatten)]
+    _extra: std::collections::HashMap<String, serde_json::Value>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Default)]
 struct ApiJobLocation {
     adresse: Option<ApiAddress>,
+    // Ignore any additional fields
+    #[serde(flatten)]
+    _extra: std::collections::HashMap<String, serde_json::Value>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Default)]
 struct ApiAddress {
     ort: Option<String>,
     plz: Option<String>,
+    // Ignore any additional fields
+    #[serde(flatten)]
+    _extra: std::collections::HashMap<String, serde_json::Value>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Default)]
 struct ApiDateRange {
     von: Option<String>,
     bis: Option<String>,
+    // Ignore any additional fields
+    #[serde(flatten)]
+    _extra: std::collections::HashMap<String, serde_json::Value>,
 }
 
 // ============================================================================
@@ -243,18 +272,30 @@ impl JobsucheClient {
             url = format!("{}?{}", url, query_parts.join("&"));
         }
 
+        info!("Fetching URL: {}", url);
+
         let response = self.client
             .get(&url)
             .header("X-API-Key", &self.api_key)
             .send()
             .await?;
 
-        if !response.status().is_success() {
-            anyhow::bail!("API error: {}", response.status());
+        let status = response.status();
+        if !status.is_success() {
+            anyhow::bail!("API error: {}", status);
         }
 
-        let result: ApiSearchResponse = response.json().await?;
-        Ok(result)
+        // Get text first for better error handling
+        let text = response.text().await?;
+        
+        match serde_json::from_str::<ApiSearchResponse>(&text) {
+            Ok(result) => Ok(result),
+            Err(e) => {
+                warn!("Failed to parse API response: {}", e);
+                warn!("Response body (first 500 chars): {}", &text[..text.len().min(500)]);
+                anyhow::bail!("Failed to parse API response: {}", e)
+            }
+        }
     }
 
     async fn job_details(&self, refnr: &str) -> anyhow::Result<ApiJobDetails> {
