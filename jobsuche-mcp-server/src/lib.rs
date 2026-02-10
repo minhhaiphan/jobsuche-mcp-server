@@ -93,6 +93,8 @@ struct ApiJobDetails {
     #[serde(rename = "quereinstiegGeeignet")]
     quereinstieg_geeignet: Option<bool>,
     chiffrenummer: Option<String>,
+    #[serde(rename = "externeUrl")]
+    externe_url: Option<String>,
     #[serde(rename = "allianzpartnerUrl")]
     allianzpartner_url: Option<String>,
     // Ignore any additional fields
@@ -214,6 +216,7 @@ pub struct GetJobDetailsResult {
     pub is_minor_employment: Option<bool>,
     pub is_temp_agency: Option<bool>,
     pub career_changer_suitable: Option<bool>,
+    pub external_url: Option<String>,
     pub partner_url: Option<String>,
 }
 
@@ -569,6 +572,7 @@ impl JobsucheMcpServer {
             is_minor_employment: details.ist_geringfuegige_beschaeftigung,
             is_temp_agency: details.ist_arbeitnehmer_ueberlassung,
             career_changer_suitable: details.quereinstieg_geeignet,
+            external_url: details.externe_url,
             partner_url: details.allianzpartner_url,
         };
 
