@@ -565,7 +565,7 @@ impl JobsucheMcpServer {
             .or_else(|| details.allianzpartner_url.clone())
             .unwrap_or_else(|| {
                 format!("https://www.arbeitsagentur.de/jobsuche/jobdetail/{}", 
-                    urlencoding::encode(&params.reference_number))
+                    &params.reference_number)
             });
 
         let result = GetJobDetailsResult {
