@@ -218,6 +218,7 @@ pub struct GetJobDetailsResult {
     pub career_changer_suitable: Option<bool>,
     pub external_url: Option<String>,
     pub partner_url: Option<String>,
+    pub application_url: String,
 }
 
 /// Single search configuration for batch operations
@@ -555,6 +556,18 @@ impl JobsucheMcpServer {
             }
         });
 
+        // Determine the best application URL with fallback hierarchy:
+        // 1. external_url (employer's application page)
+        // 2. partner_url (partner job board)
+        // 3. Internal Bundesagentur für Arbeit URL (always available)
+        let application_url = details.externe_url
+            .clone()
+            .or_else(|| details.allianzpartner_url.clone())
+            .unwrap_or_else(|| {
+                format!("https://www.arbeitsagentur.de/jobsuche/jobdetail/{}", 
+                    urlencoding::encode(&params.reference_number))
+            });
+
         let result = GetJobDetailsResult {
             reference_number: params.reference_number.clone(),
             title: details.titel,
@@ -574,6 +587,7 @@ impl JobsucheMcpServer {
             career_changer_suitable: details.quereinstieg_geeignet,
             external_url: details.externe_url,
             partner_url: details.allianzpartner_url,
+            application_url,
         };
 
         info!("Job details retrieved successfully");
