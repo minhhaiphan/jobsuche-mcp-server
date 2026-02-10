@@ -188,6 +188,7 @@ pub struct JobSummary {
     pub location: String,
     pub published_date: Option<String>,
     pub external_url: Option<String>,
+    pub application_url: String,
 }
 
 /// Parameters for getting job details
@@ -502,6 +503,14 @@ impl JobsucheMcpServer {
                     job.arbeitsort.plz.as_ref().map(|plz| format!(" ({})", plz)).unwrap_or_default()
                 );
 
+                // Generate application_url with fallback hierarchy
+                let application_url = job.externe_url
+                    .clone()
+                    .unwrap_or_else(|| {
+                        format!("https://www.arbeitsagentur.de/jobsuche/jobdetail/{}", 
+                            &job.refnr)
+                    });
+
                 JobSummary {
                     reference_number: job.refnr.clone(),
                     title: job.titel.clone().unwrap_or_else(|| job.beruf.clone()),
@@ -509,6 +518,7 @@ impl JobsucheMcpServer {
                     location,
                     published_date: job.aktuelle_veroeffentlichungsdatum.clone(),
                     external_url: job.externe_url.clone(),
+                    application_url,
                 }
             })
             .collect();
